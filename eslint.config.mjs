@@ -5,7 +5,7 @@ import tseslint from "typescript-eslint";
 export default [
   {
     ...eslint.configs.recommended,
-    files: ["src/**/*.ts", "scripts/**/*.mjs"],
+    files: ["src/**/*.ts", "scripts/**/*.mjs", "tests/**/*.mjs"],
   },
   ...tseslint.configs.recommended.map((config) => ({
     ...config,
@@ -16,7 +16,7 @@ export default [
     languageOptions: { globals: globals.serviceworker },
   },
   {
-    files: ["scripts/**/*.mjs"],
+    files: ["scripts/**/*.mjs", "tests/**/*.mjs"],
     languageOptions: { globals: globals.node },
   },
 ];

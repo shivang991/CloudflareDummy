@@ -17,9 +17,7 @@ npm run db:migrate
 npm run dev
 ```
 
-Run `npm run lint`, `npm run typecheck`, and `npm run format:check` to check the project. Run `npm run format` to apply Prettier formatting.
-
-In another terminal, run `npm run smoke` to exercise create, list, read, update, validation, and delete against the local Worker. It cleans up its test item.
+Run `npm test` to exercise create, list, read, update, validation, and delete with Vitest. The tests call the Worker app directly and use an in-memory database stub, so they do not need a running Worker or database. Run `npm run lint`, `npm run typecheck`, and `npm run format:check` for the other checks. Run `npm run format` to apply Prettier formatting.
 
 For deployment, run `npx wrangler secret put DATABASE_URL` and then `npm run deploy`. The database URL belongs in Wrangler secrets, never in `wrangler.jsonc` or source control.
 
