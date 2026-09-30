@@ -7,6 +7,9 @@
     "deploy": "wrangler deploy",
     "db:migrate": "node --env-file=.dev.vars scripts/migrate.mjs",
     "smoke": "node scripts/smoke.mjs",
+    "lint": "eslint src scripts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -15,7 +18,12 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "typescript": "^7.0.2",
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.11.0",
+    "globals": "^17.12.0",
+    "prettier": "^3.9.9",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.0",
     "wrangler": "^4.143.0"
   }
 }

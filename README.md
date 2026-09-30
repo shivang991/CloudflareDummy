@@ -17,19 +17,21 @@ npm run db:migrate
 npm run dev
 ```
 
+Run `npm run lint`, `npm run typecheck`, and `npm run format:check` to check the project. Run `npm run format` to apply Prettier formatting.
+
 In another terminal, run `npm run smoke` to exercise create, list, read, update, validation, and delete against the local Worker. It cleans up its test item.
 
 For deployment, run `npx wrangler secret put DATABASE_URL` and then `npm run deploy`. The database URL belongs in Wrangler secrets, never in `wrangler.jsonc` or source control.
 
 ## API
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| GET | `/health` | Worker health (does not query the database) |
-| GET | `/api/items` | List newest 100 items |
-| POST | `/api/items` | Create an item |
-| GET | `/api/items/:id` | Read an item |
-| PUT | `/api/items/:id` | Replace title and description |
-| DELETE | `/api/items/:id` | Delete an item |
+| Method | Path             | Purpose                                     |
+| ------ | ---------------- | ------------------------------------------- |
+| GET    | `/health`        | Worker health (does not query the database) |
+| GET    | `/api/items`     | List newest 100 items                       |
+| POST   | `/api/items`     | Create an item                              |
+| GET    | `/api/items/:id` | Read an item                                |
+| PUT    | `/api/items/:id` | Replace title and description               |
+| DELETE | `/api/items/:id` | Delete an item                              |
 
 POST and PUT accept JSON like `{ "title": "Example", "description": "Optional" }`. IDs are UUIDs. The API currently permits anonymous access; wire token or session verification into `authenticate()` before using it with real data.
