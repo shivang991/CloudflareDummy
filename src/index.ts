@@ -5,6 +5,12 @@ import { inputError, items } from "./items";
 import type { AppEnv } from "./types";
 
 const app = new OpenAPIHono<AppEnv>();
+app.openAPIRegistry.registerComponent("securitySchemes", "GoogleIdToken", {
+  type: "http",
+  scheme: "bearer",
+  bearerFormat: "JWT",
+  description: "Google ID token issued for this API's configured OAuth client ID",
+});
 
 app.openapi(
   createRoute({
@@ -28,7 +34,8 @@ app.doc("/openapi.json", {
   info: {
     title: "Items API",
     version: "1.0.0",
-    description: "Public JSON API for creating, listing, reading, replacing, and deleting items.",
+    description:
+      "JSON API for creating, listing, reading, replacing, and deleting items with Google ID token authentication.",
   },
 });
 

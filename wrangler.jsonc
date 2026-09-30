@@ -4,6 +4,6 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-09-29",
   "secrets": {
-    "required": ["DATABASE_URL"],
+    "required": ["DATABASE_URL", "GOOGLE_CLIENT_ID"],
   },
 }

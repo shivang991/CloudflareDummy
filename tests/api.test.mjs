@@ -1,11 +1,45 @@
 import { neon } from "@neondatabase/serverless";
-import { beforeEach, expect, test, vi } from "vitest";
+import { exportJWK, generateKeyPair, SignJWT } from "jose";
+import { beforeAll, beforeEach, expect, test, vi } from "vitest";
 import app from "../src/index";
 
 vi.mock("@neondatabase/serverless", () => ({ neon: vi.fn() }));
 
 const items = new Map();
-const env = { DATABASE_URL: "postgresql://test" };
+const env = {
+  DATABASE_URL: "postgresql://test",
+  GOOGLE_CLIENT_ID: "test-client.apps.googleusercontent.com",
+};
+let privateKey;
+let validToken;
+
+async function token(claims = {}, key = privateKey) {
+  return new SignJWT({ sub: "google-user-123" })
+    .setProtectedHeader({ alg: "RS256", kid: "test-key" })
+    .setIssuer(claims.iss ?? "https://accounts.google.com")
+    .setAudience(claims.aud ?? env.GOOGLE_CLIENT_ID)
+    .setIssuedAt()
+    .setExpirationTime(claims.exp ?? "1h")
+    .sign(key);
+}
+
+beforeAll(async () => {
+  const pair = await generateKeyPair("RS256");
+  privateKey = pair.privateKey;
+  const jwk = await exportJWK(pair.publicKey);
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () =>
+      Response.json(
+        { keys: [{ ...jwk, kid: "test-key", alg: "RS256", use: "sig" }] },
+        {
+          headers: { "cache-control": "public, max-age=3600" },
+        },
+      ),
+    ),
+  );
+  validToken = await token();
+});
 
 beforeEach(() => {
   items.clear();
@@ -44,7 +78,10 @@ beforeEach(() => {
 });
 
 async function call(path, init) {
-  const response = await app.request(path, init, env);
+  const headers = new Headers(init?.headers);
+  if (path.startsWith("/api/") && !headers.has("authorization"))
+    headers.set("authorization", `Bearer ${validToken}`);
+  const response = await app.request(path, { ...init, headers }, env);
   const body = response.status === 204 ? null : await response.json();
   return { response, body };
 }
@@ -125,4 +162,32 @@ test("serves an OpenAPI document for client generation", async () => {
   expect(body.paths["/api/items"].post.responses["201"].content["application/json"]).toBeDefined();
   expect(body.paths["/api/items/{id}"].delete.responses["204"]).toBeDefined();
   expect(body.components.schemas.Item.properties).toHaveProperty("id");
+  expect(body.components.securitySchemes.GoogleIdToken).toMatchObject({
+    type: "http",
+    scheme: "bearer",
+  });
+  expect(body.paths["/api/items"].get.security).toEqual([{ GoogleIdToken: [] }]);
+  expect(body.paths["/health"].get.security).toBeUndefined();
+});
+
+test("requires a valid Google ID bearer token on API routes", async () => {
+  const missing = await call("/api/items", { headers: { authorization: "" } });
+  expect(missing.response.status).toBe(401);
+  expect(missing.response.headers.get("www-authenticate")).toBe('Bearer realm="api"');
+  expect(neon).not.toHaveBeenCalled();
+
+  const malformed = await call("/api/items", { headers: { authorization: "Basic abc" } });
+  expect(malformed.response.status).toBe(401);
+
+  const wrongAudience = await token({ aud: "another-client.apps.googleusercontent.com" });
+  const wrongIssuer = await token({ iss: "https://example.com" });
+  const expired = await token({ exp: Math.floor(Date.now() / 1000) - 60 });
+  const wrongKey = (await generateKeyPair("RS256")).privateKey;
+  const badSignature = await token({}, wrongKey);
+  for (const value of [wrongAudience, wrongIssuer, expired, badSignature, "not-a-jwt"]) {
+    const result = await call("/api/items", { headers: { authorization: `Bearer ${value}` } });
+    expect(result.response.status).toBe(401);
+    expect(result.body).toEqual({ error: "Invalid Google ID token" });
+  }
+  expect(neon).not.toHaveBeenCalled();
 });

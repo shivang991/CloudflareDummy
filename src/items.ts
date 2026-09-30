@@ -36,6 +36,7 @@ const errorResponse = (description: string) => ({
   description,
   content: jsonContent(errorSchema),
 });
+const googleSecurity = [{ GoogleIdToken: [] }];
 const requestBody = {
   required: true,
   content: { "application/json": { schema: itemInputSchema } },
@@ -66,11 +67,13 @@ items.openapi(
     path: "/items",
     summary: "List items",
     description: "Returns the 100 newest items.",
+    security: googleSecurity,
     responses: {
       200: {
         description: "Items ordered by creation time, newest first",
         content: jsonContent(z.object({ items: z.array(itemSchema) })),
       },
+      401: errorResponse("Missing or invalid Google ID token"),
       500: errorResponse("Server error"),
     },
   }),
@@ -87,6 +90,7 @@ items.openapi(
     method: "post",
     path: "/items",
     summary: "Create an item",
+    security: googleSecurity,
     middleware: [requireJson],
     request: { body: requestBody },
     responses: {
@@ -96,6 +100,7 @@ items.openapi(
         headers: { Location: { schema: { type: "string" } } },
       },
       400: errorResponse("Invalid JSON or item fields"),
+      401: errorResponse("Missing or invalid Google ID token"),
       500: errorResponse("Server error"),
     },
   }),
@@ -115,10 +120,12 @@ items.openapi(
     method: "get",
     path: "/items/{id}",
     summary: "Get an item",
+    security: googleSecurity,
     request: { params: idParamsSchema },
     responses: {
       200: itemResponse,
       400: errorResponse("Invalid item ID"),
+      401: errorResponse("Missing or invalid Google ID token"),
       404: errorResponse("Item not found"),
       500: errorResponse("Server error"),
     },
@@ -137,11 +144,13 @@ items.openapi(
     path: "/items/{id}",
     summary: "Replace an item",
     description: "Replaces title and description. Omitted description becomes an empty string.",
+    security: googleSecurity,
     middleware: [requireJson],
     request: { params: idParamsSchema, body: requestBody },
     responses: {
       200: itemResponse,
       400: errorResponse("Invalid item ID, JSON, or item fields"),
+      401: errorResponse("Missing or invalid Google ID token"),
       404: errorResponse("Item not found"),
       500: errorResponse("Server error"),
     },
@@ -160,10 +169,12 @@ items.openapi(
     method: "delete",
     path: "/items/{id}",
     summary: "Delete an item",
+    security: googleSecurity,
     request: { params: idParamsSchema },
     responses: {
       204: { description: "Item deleted" },
       400: errorResponse("Invalid item ID"),
+      401: errorResponse("Missing or invalid Google ID token"),
       404: errorResponse("Item not found"),
       500: errorResponse("Server error"),
     },
