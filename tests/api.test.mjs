@@ -1,7 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
 import { beforeAll, beforeEach, expect, test, vi } from "vitest";
-import app from "../src/index";
+import app, { createApp } from "../src/index";
 
 vi.mock("@neondatabase/serverless", () => ({ neon: vi.fn() }));
 
@@ -189,5 +189,29 @@ test("requires a valid Google ID bearer token on API routes", async () => {
     expect(result.response.status).toBe(401);
     expect(result.body).toEqual({ error: "Invalid Google ID token" });
   }
+  expect(neon).not.toHaveBeenCalled();
+});
+
+test("routes accept a repository factory without using Neon", async () => {
+  neon.mockClear();
+  const repository = {
+    list: vi.fn().mockResolvedValue([]),
+    create: vi.fn(),
+    get: vi.fn(),
+    replace: vi.fn(),
+    delete: vi.fn(),
+  };
+  const createRepository = vi.fn().mockReturnValue(repository);
+  const testApp = createApp(createRepository);
+  const response = await testApp.request(
+    "/api/items",
+    { headers: { authorization: `Bearer ${validToken}` } },
+    env,
+  );
+
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({ items: [] });
+  expect(createRepository).toHaveBeenCalledWith(env.DATABASE_URL);
+  expect(repository.list).toHaveBeenCalledOnce();
   expect(neon).not.toHaveBeenCalled();
 });
