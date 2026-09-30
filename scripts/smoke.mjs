@@ -17,9 +17,10 @@ try {
   const created = await call("/api/items", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ title: "Smoke test", description: "Created by smoke.mjs" }),
+    body: JSON.stringify({ title: "  Smoke test  ", description: "Created by smoke.mjs" }),
   });
   assert.equal(created.response.status, 201);
+  assert.equal(created.body.item.title, "Smoke test");
   id = created.body.item.id;
 
   const listed = await call("/api/items");
@@ -37,6 +38,7 @@ try {
   });
   assert.equal(updated.response.status, 200);
   assert.equal(updated.body.item.title, "Updated smoke test");
+  assert.equal(updated.body.item.description, "");
 
   const invalid = await call("/api/items", {
     method: "POST",
@@ -44,6 +46,20 @@ try {
     body: JSON.stringify({ title: "" }),
   });
   assert.equal(invalid.response.status, 400);
+
+  const invalidDescription = await call("/api/items", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ title: "Valid", description: 42 }),
+  });
+  assert.equal(invalidDescription.response.status, 400);
+
+  const malformedJson = await call(`/api/items/${id}`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: "{",
+  });
+  assert.equal(malformedJson.response.status, 400);
 
   const invalidId = await call("/api/items/not-a-uuid");
   assert.equal(invalidId.response.status, 400);
