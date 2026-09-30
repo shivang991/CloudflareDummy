@@ -27,7 +27,7 @@ try {
   assert.ok(listed.body.items.some((item) => item.id === id));
 
   const fetched = await call(`/api/items/${id}`);
-  assert.equal(fetched.response.status, 200);
+  assert.equal(fetched.response.status, 200, JSON.stringify({ id, body: fetched.body }));
   assert.equal(fetched.body.item.title, "Smoke test");
 
   const updated = await call(`/api/items/${id}`, {
@@ -44,6 +44,13 @@ try {
     body: JSON.stringify({ title: "" }),
   });
   assert.equal(invalid.response.status, 400);
+
+  const invalidId = await call("/api/items/not-a-uuid");
+  assert.equal(invalidId.response.status, 400);
+
+  const wrongMethod = await call("/api/items", { method: "PUT" });
+  assert.equal(wrongMethod.response.status, 405);
+  assert.equal(wrongMethod.response.headers.get("allow"), "GET, POST");
 
   const deleted = await call(`/api/items/${id}`, { method: "DELETE" });
   assert.equal(deleted.response.status, 204);

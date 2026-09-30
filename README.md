@@ -1,6 +1,6 @@
 # Dummy Cloudflare Worker CRUD API
 
-A small public JSON API backed by Neon PostgreSQL. Authentication is intentionally left as a hook in `src/auth.ts` for a later Google OAuth integration.
+A small public JSON API built with Hono and backed by Neon PostgreSQL. Authentication is intentionally left as middleware in `src/auth.ts` for a later Google OAuth integration.
 
 ## Setup
 
