@@ -31,5 +31,8 @@ For deployment, run `npx wrangler secret put DATABASE_URL` and then `npm run dep
 | GET    | `/api/items/:id` | Read an item                                |
 | PUT    | `/api/items/:id` | Replace title and description               |
 | DELETE | `/api/items/:id` | Delete an item                              |
+| GET    | `/openapi.json`  | OpenAPI 3.0 contract for client generation  |
 
 POST and PUT accept JSON like `{ "title": "Example", "description": "Optional" }`. IDs are UUIDs. The API currently permits anonymous access; wire token or session verification into `authenticate()` before using it with real data.
+
+The OpenAPI document is generated from the route and Zod schemas. Fetch `/openapi.json` from a running Worker to use it in an Android or web client repository.

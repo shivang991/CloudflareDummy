@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@hono/zod-openapi": "^1.6.3",
     "@neondatabase/serverless": "^1.1.0",
     "hono": "^4.13.11",
     "zod": "^4.6.5"

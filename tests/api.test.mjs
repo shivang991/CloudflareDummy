@@ -111,3 +111,18 @@ test("rejects invalid input, IDs, and methods", async () => {
   expect(wrongMethod.response.headers.get("allow")).toBe("GET, POST");
   expect(items.size).toBe(0);
 });
+
+test("serves an OpenAPI document for client generation", async () => {
+  const { response, body } = await call("/openapi.json");
+  expect(response.status).toBe(200);
+  expect(body.openapi).toBe("3.0.3");
+  expect(Object.keys(body.paths)).toEqual(["/health", "/api/items", "/api/items/{id}"]);
+  expect(Object.keys(body.paths["/api/items"])).toEqual(["get", "post"]);
+  expect(Object.keys(body.paths["/api/items/{id}"])).toEqual(["get", "put", "delete"]);
+  expect(
+    body.paths["/api/items"].post.requestBody.content["application/json"].schema,
+  ).toBeDefined();
+  expect(body.paths["/api/items"].post.responses["201"].content["application/json"]).toBeDefined();
+  expect(body.paths["/api/items/{id}"].delete.responses["204"]).toBeDefined();
+  expect(body.components.schemas.Item.properties).toHaveProperty("id");
+});
