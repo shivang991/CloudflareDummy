@@ -1,2 +1,5 @@
 DATABASE_URL="postgresql://USER:PASSWORD@HOST/DATABASE?sslmode=require"
 GOOGLE_CLIENT_ID="YOUR_CLIENT_ID.apps.googleusercontent.com"
+
+ADMIN_EMAIL="admin@example.com"
+SEED_USER_EMAIL="demo@example.com"

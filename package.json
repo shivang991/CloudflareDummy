@@ -1,12 +1,15 @@
 {
-  "name": "dummy-neon-worker",
+  "name": "mini-crm-worker",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "db:migrate": "node --env-file=.dev.vars scripts/migrate.mjs",
+    "db:seed": "node --env-file=.dev.vars scripts/seed.mjs",
     "test": "vitest run",
+    "test:unit": "vitest run tests/**/*Unit.test.ts",
+    "test:system": "vitest run tests/**/*System.test.ts",
     "lint": "eslint src scripts tests",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -20,7 +23,10 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@eslint/js": "^10.0.1",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "@types/node": "^26.6.3",
     "eslint": "^10.11.0",
     "globals": "^17.12.0",
     "prettier": "^3.9.9",
