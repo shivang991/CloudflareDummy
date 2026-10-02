@@ -23,6 +23,7 @@ export function authorizeUser(c: Context<AppEnv>, id: string) {
 export async function accountScope(c: Context<AppEnv>, actAs?: string) {
   const user = requireUser(c);
   if (!actAs) return user.id;
+  if (c.get("authMethod") === "apiKey") throw new ApiError(403, "API keys cannot use actAs");
   requireAdmin(c);
   if (!(await usersRepository(c.get("db")).get(actAs)))
     throw new ApiError(404, "Account not found");

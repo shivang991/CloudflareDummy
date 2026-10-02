@@ -7,7 +7,7 @@ import {
   requireJson,
   router,
   scopeQuery,
-  security,
+  apiKeySecurity as security,
   uuid,
   ApiError,
 } from "../utils/http";

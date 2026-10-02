@@ -9,7 +9,15 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import ErrorNotice from "./ErrorNotice.vue";
-defineProps<{ open: boolean; title: string; description: string; busy: boolean; error: string }>();
+defineProps<{
+  open: boolean;
+  title: string;
+  description: string;
+  busy: boolean;
+  error: string;
+  confirmLabel?: string;
+  busyLabel?: string;
+}>();
 const emit = defineEmits<{ "update:open": [open: boolean]; confirm: [] }>();
 const handleOpen = (open: boolean, busy: boolean) => {
   if (!busy) emit("update:open", open);
@@ -31,7 +39,7 @@ const handleOpen = (open: boolean, busy: boolean) => {
           >Cancel</Button
         >
         <Button variant="destructive" :disabled="busy" @click="emit('confirm')">{{
-          busy ? "Deleting…" : "Delete permanently"
+          busy ? (busyLabel ?? "Deleting…") : (confirmLabel ?? "Delete permanently")
         }}</Button>
       </DialogFooter>
     </DialogContent>

@@ -1,5 +1,6 @@
 // Type-only imports keep the Worker and database libraries out of the browser bundle.
 export type { User } from "../../src/auth/schemas";
+export type { ApiKey } from "../../src/auth/apiKeys";
 export type { Collection } from "../../src/collections/schemas";
 export type { Field, CreateField } from "../../src/fields/schemas";
 export type { Item, ItemFilter, ValueInput } from "../../src/items/schemas";

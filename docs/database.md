@@ -3,6 +3,7 @@
 The screenshots' User, Collection, Field, Item, category option, relation metadata, and typed value concepts are preserved. The implementation uses plural `crm_` table names and makes these adjustments:
 
 - `google_sub` identifies a linked Google account; provisioned accounts begin with null and claim their verified email once.
+- `crm_api_keys` belongs to a user account and stores a unique SHA-256 key hash, a short identifying prefix, a name, and creation time. Full keys are never stored. Deleting a key revokes it; deleting its owner cascades its keys. Authentication resolves the current owner record, while endpoint permissions stay limited to item CRUD and collection reads regardless of the owner's role.
 - `profile` is JSONB; `role` defaults to USER. User emails are normalized to lowercase and unique.
 - Collections and items include creation/update timestamps.
 - The relation target lives directly on the field as `relation_collection_id`. The screenshot's relationship reference did not identify its originating field.
@@ -11,6 +12,7 @@ The screenshots' User, Collection, Field, Item, category option, relation metada
 
 ```mermaid
 erDiagram
+  crm_users ||--o{ crm_api_keys : owns
   crm_users ||--o{ crm_collections : owns
   crm_collections ||--o{ crm_fields : defines
   crm_collections ||--o{ crm_items : contains

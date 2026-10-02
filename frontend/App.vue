@@ -2,7 +2,7 @@
 import { computed, ref } from "vue";
 import { useMediaQuery } from "@vueuse/core";
 import { useRoute } from "vue-router";
-import { Database, Users, LogOut, Menu, X, ShieldCheck } from "@lucide/vue";
+import { Database, Users, KeyRound, LogOut, Menu, X, ShieldCheck } from "@lucide/vue";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { currentUser, signOut } from "@/composables/auth";
@@ -35,9 +35,23 @@ const accountId = computed(() => route.params.accountId as string | undefined);
       </p>
       <RouterLink
         to="/admin/accounts"
-        class="flex items-center gap-3 rounded-lg bg-muted px-3 py-2.5 text-sm font-medium"
+        :class="[
+          'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-muted',
+          route.path.startsWith('/admin/accounts') && 'bg-muted',
+        ]"
+        :aria-current="route.path.startsWith('/admin/accounts') ? 'page' : undefined"
         @click="mobileMenu = false"
         ><Users class="size-4" /> Accounts</RouterLink
+      >
+      <RouterLink
+        to="/admin/api-keys"
+        :class="[
+          'mt-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-muted',
+          route.path === '/admin/api-keys' && 'bg-muted',
+        ]"
+        :aria-current="route.path === '/admin/api-keys' ? 'page' : undefined"
+        @click="mobileMenu = false"
+        ><KeyRound class="size-4" /> API keys</RouterLink
       >
       <div class="mt-auto rounded-lg border p-3">
         <div class="flex items-center gap-2 text-sm font-medium">

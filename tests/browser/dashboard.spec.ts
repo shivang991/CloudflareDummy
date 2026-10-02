@@ -1,12 +1,17 @@
 import { expect, test, type Page } from "@playwright/test";
-import type { User, Collection, Item, Field } from "../../frontend/lib/types";
+import type { User, Collection, Item, Field, ApiKey } from "../../frontend/lib/types";
 
 const id = (n: number) => `123e4567-e89b-42d3-a456-${String(n).padStart(12, "0")}`;
 
 const timestamp = "2026-10-01T10:00:00.000Z";
 const token = `test.${Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 })).toString("base64url")}.signature`;
 
-async function mockDashboard(page: Page, role: User["role"] = "ADMIN", extraAccounts = 0) {
+async function mockDashboard(
+  page: Page,
+  role: User["role"] = "ADMIN",
+  extraAccounts = 0,
+  extraKeys = 0,
+) {
   const admin: User = {
     id: id(1),
     email: "admin@example.com",
@@ -77,6 +82,16 @@ async function mockDashboard(page: Page, role: User["role"] = "ADMIN", extraAcco
     },
   ];
   const mutations: { path: string; method: string; body: Record<string, unknown> }[] = [];
+  const apiKeys: ApiKey[] = Array.from({ length: extraKeys }, (_, index) => ({
+    id: id(2000 + index),
+    user_id: admin.id,
+    name: `Integration ${index}`,
+    key_prefix: "crm_0123456789ab",
+    created_at: timestamp,
+  }));
+  const keySecret = `crm_${"a".repeat(64)}`;
+  let nextKeyId = 3000;
+  let keyFailure: string | null = null;
   let forceUnauthorized = false;
   let referenceConflict = false;
   await page.route("https://accounts.google.com/gsi/client", (route) =>
@@ -97,6 +112,14 @@ async function mockDashboard(page: Page, role: User["role"] = "ADMIN", extraAcco
       return;
     }
     if (path.startsWith("/collections")) expect(url.searchParams.get("actAs")).toBe(id(2));
+    if (path.startsWith("/api-keys")) {
+      expect(url.searchParams.has("actAs")).toBe(false);
+      expect(request.headers()["x-api-key"]).toBeUndefined();
+      if (keyFailure === method) {
+        await route.fulfill({ status: 500, json: { error: "Key service unavailable" } });
+        return;
+      }
+    }
     if (referenceConflict && method === "DELETE" && path.includes("/items/")) {
       await route.fulfill({
         status: 409,
@@ -135,6 +158,25 @@ async function mockDashboard(page: Page, role: User["role"] = "ADMIN", extraAcco
       } else {
         const data = paginate(users);
         result = { users: data.rows, page: data.page };
+      }
+    } else if (parts[0] === "api-keys") {
+      if (method === "POST") {
+        const apiKey: ApiKey = {
+          id: id(nextKeyId++),
+          user_id: admin.id,
+          name: String(body.name),
+          key_prefix: keySecret.slice(0, 16),
+          created_at: timestamp,
+        };
+        apiKeys.unshift(apiKey);
+        result = { api_key: apiKey, key: keySecret };
+      } else if (method === "DELETE") {
+        const index = apiKeys.findIndex((key) => key.id === parts[1]);
+        expect(index).toBeGreaterThanOrEqual(0);
+        apiKeys.splice(index, 1);
+      } else {
+        const data = paginate(apiKeys);
+        result = { api_keys: data.rows, page: data.page };
       }
     } else if (parts[0] === "collections") {
       if (parts.length === 1) {
@@ -238,6 +280,10 @@ async function mockDashboard(page: Page, role: User["role"] = "ADMIN", extraAcco
   });
   return {
     mutations,
+    keySecret,
+    failKeys: (method: string | null) => {
+      keyFailure = method;
+    },
     expire: () => {
       forceUnauthorized = true;
     },
@@ -407,9 +453,155 @@ test("non-admin accounts are denied", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Accounts", exact: true })).toHaveCount(0);
 });
 
+test("API keys can be created, copied once, and revoked through mobile navigation", async ({
+  page,
+}) => {
+  const state = await mockDashboard(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/admin/accounts");
+  await page.getByRole("button", { name: "Sign in with Google" }).click();
+  await page.getByRole("button", { name: "Toggle navigation" }).click();
+  await page.getByRole("link", { name: "API keys", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "API keys", exact: true })).toBeVisible();
+  await expect(page.locator("aside")).toHaveAttribute("inert", "");
+  await expect(page.getByText("No API keys yet.", { exact: false })).toBeVisible();
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: async (value: string) => {
+          (window as Window & { copiedSecret?: string }).copiedSecret = value;
+        },
+      },
+    });
+  });
+  await page.getByRole("button", { name: "Create API key", exact: true }).click();
+  await page.getByLabel("Key name").fill("  Website sync  ");
+  await page.getByRole("button", { name: "Create key", exact: true }).click();
+  await expect(page.getByLabel("Your new API key")).toHaveValue(state.keySecret);
+  await page.screenshot({
+    path: "test-results/api-key-secret-mobile.png",
+    fullPage: true,
+    animations: "disabled",
+  });
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.getByRole("button", { name: "Copy key", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("Key copied to clipboard");
+  expect(
+    await page.evaluate(() => (window as Window & { copiedSecret?: string }).copiedSecret),
+  ).toBe(state.keySecret);
+  const creation = state.mutations.find((m) => m.path === "/api-keys" && m.method === "POST")!;
+  expect(creation.body).toEqual({ name: "Website sync" });
+  await page.getByRole("button", { name: "I’ve saved the key" }).click();
+  await expect(page.getByLabel("Your new API key")).toHaveCount(0);
+  await expect(page.getByText("Website sync", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Revoke Website sync", exact: true }),
+  ).toBeInViewport({ ratio: 1 });
+  await page.screenshot({
+    path: "test-results/api-keys-mobile.png",
+    fullPage: true,
+    animations: "disabled",
+  });
+  await page.getByRole("button", { name: "Revoke Website sync", exact: true }).click();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  expect(
+    state.mutations.filter((m) => m.path.startsWith("/api-keys/") && m.method === "DELETE"),
+  ).toHaveLength(0);
+  await page.getByRole("button", { name: "Revoke Website sync", exact: true }).click();
+  await page.getByRole("button", { name: "Revoke key", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByText("Website sync", { exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Create API key", exact: true }).click();
+  await expect(page.getByLabel("Key name")).toHaveValue("");
+  await expect(page.getByLabel("Your new API key")).toHaveCount(0);
+});
+
+test("key service and clipboard errors can be retried without losing the new secret", async ({
+  page,
+}) => {
+  const state = await mockDashboard(page);
+  state.failKeys("GET");
+  await page.goto("/admin/api-keys");
+  await page.getByRole("button", { name: "Sign in with Google" }).click();
+  await expect(page.getByRole("alert")).toContainText("Key service unavailable");
+  state.failKeys(null);
+  await page.getByRole("button", { name: "Refresh API keys" }).click();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await page.getByRole("button", { name: "Create API key", exact: true }).click();
+  await page.getByLabel("Key name").fill("Sync");
+  state.failKeys("POST");
+  await page.getByRole("button", { name: "Create key", exact: true }).click();
+  await expect(page.getByRole("dialog").getByRole("alert")).toContainText(
+    "Key service unavailable",
+  );
+  await expect(page.getByLabel("Key name")).toHaveValue("Sync");
+  state.failKeys("GET");
+  await page.getByRole("button", { name: "Create key", exact: true }).click();
+  await expect(page.getByLabel("Your new API key")).toHaveValue(state.keySecret);
+  await expect(page.getByRole("button", { name: "Create key", exact: true })).toHaveCount(0);
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: async () => {
+          throw new Error("Clipboard denied");
+        },
+      },
+    });
+  });
+  await page.getByRole("button", { name: "Copy key", exact: true }).click();
+  await expect(page.getByRole("dialog").getByRole("alert")).toContainText("copy it manually");
+  await expect(page.getByLabel("Your new API key")).toHaveValue(state.keySecret);
+  await page.getByRole("button", { name: "I’ve saved the key" }).click();
+  state.failKeys(null);
+  await page.getByRole("button", { name: "Refresh API keys" }).click();
+  await expect(page.getByRole("cell", { name: "Sync", exact: true })).toBeVisible();
+  state.failKeys("DELETE");
+  await page.getByRole("button", { name: "Revoke Sync", exact: true }).click();
+  await page.getByRole("button", { name: "Revoke key", exact: true }).click();
+  await expect(page.getByRole("dialog").getByRole("alert")).toContainText(
+    "Key service unavailable",
+  );
+  state.failKeys(null);
+  await page.getByRole("button", { name: "Revoke key", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByRole("cell", { name: "Sync", exact: true })).toHaveCount(0);
+});
+
+test("revoking the last key on a page returns to the previous page and expiry clears secrets", async ({
+  page,
+}) => {
+  const state = await mockDashboard(page, "ADMIN", 0, 26);
+  await page.goto("/admin/api-keys");
+  await page.getByRole("button", { name: "Sign in with Google" }).click();
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(page.getByRole("cell", { name: "Integration 25", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Revoke Integration 25", exact: true }).click();
+  await page.getByRole("button", { name: "Revoke key", exact: true }).click();
+  await expect(page.getByRole("cell", { name: "Integration 0", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Previous", exact: true })).toBeDisabled();
+  await page.screenshot({
+    path: "test-results/api-keys-desktop.png",
+    fullPage: true,
+    animations: "disabled",
+  });
+  await page.getByRole("button", { name: "Create API key", exact: true }).click();
+  await page.getByLabel("Key name").fill("Expiry check");
+  await page.getByRole("button", { name: "Create key", exact: true }).click();
+  await expect(page.getByLabel("Your new API key")).toHaveValue(state.keySecret);
+  state.expire();
+  await page.getByRole("button", { name: "I’ve saved the key" }).click();
+  await page.getByRole("button", { name: "Refresh API keys" }).click();
+  await expect(page.getByRole("heading", { name: "Admin workspace" })).toBeVisible();
+  await expect(page.getByLabel("Your new API key")).toHaveCount(0);
+});
+
 test("static deep links preserve real Worker routing and authentication", async ({ request }) => {
   const deepLink = await request.get(`/admin/accounts/${id(2)}/collections/${id(3)}`);
   expect(deepLink.headers()["content-type"]).toContain("text/html");
+  expect((await request.get("/admin/api-keys")).headers()["content-type"]).toContain("text/html");
   const health = await request.get("/health");
   expect(await health.json()).toEqual({ ok: true });
   const schema = await request.get("/openapi.json");

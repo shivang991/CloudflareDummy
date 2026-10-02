@@ -1,12 +1,14 @@
 # Mini CRM API v2
 
-Local base URL: `http://localhost:8787`. All `/api/*` requests require:
+Local base URL: `http://localhost:8787`. All `/api/*` requests require authentication. Google authentication works on every endpoint:
 
 ```http
 Authorization: Bearer <Google ID token>
 ```
 
 Use a **Google ID token** issued for `GOOGLE_CLIENT_ID`. Verification checks the Google signature, RS256 algorithm, issuer, audience, expiration, subject, and verified email. Access tokens are not accepted. Account roles come from Postgres, never from client-supplied claims. There is no password or session endpoint; Google handles sign-in.
+
+Item CRUD and collection reads also accept an account-owned API key through `X-API-Key`. Send either `Authorization` or `X-API-Key`; sending both returns `400`. API keys do not require a Google token on each request.
 
 Requests with bodies must use `Content-Type: application/json`. Unknown body properties are rejected. All IDs are UUIDs. Names are trimmed, nonempty, and at most 200 characters. Request bodies are limited to 256 KiB. Updates use `PATCH`. Deletes return `204` with no body. Creates return `201` and a `Location` header. Dates/timestamps in responses are strings.
 
@@ -58,7 +60,7 @@ Account updates accept `email`, `profile`, and (ADMIN only) `role`. A USER's new
 
 ## Account scope and “Act as”
 
-Collection, field, and item endpoints default to the caller's account. An ADMIN accesses another account by adding `?actAs=<userId>` on **each request**. This selects the resource owner; the caller remains the admin. IDs do not override scope. This parameter is never accepted from a USER, even if it names their own account. A nonexistent target account returns `404`.
+Collection, field, and item endpoints default to the caller's account. A Google-authenticated ADMIN accesses another account by adding `?actAs=<userId>` on **each request**. This selects the resource owner; the caller remains the admin. IDs do not override scope. This parameter is never accepted from a USER or an API key, even if it names their own account. A nonexistent target account returns `404`.
 
 ```sh
 curl -H "Authorization: Bearer $ID_TOKEN" \
@@ -66,6 +68,43 @@ curl -H "Authorization: Bearer $ID_TOKEN" \
 ```
 
 Without `actAs`, an admin sees their own collections. Other-account resources return `404` for reads and mutations; user deletion or role assignment without admin rights returns `403`. User administration uses the user ID in the path and does not need `actAs`.
+
+## API keys
+
+Registered users, including admins, can manage keys for their own account using **Google authentication**:
+
+| Method | Path                    | Behavior                                        |
+| ------ | ----------------------- | ----------------------------------------------- |
+| POST   | `/api/api-keys`         | Create key with `{"name":"Integration"}`        |
+| GET    | `/api/api-keys`         | List key metadata; accepts `limit` and `offset` |
+| DELETE | `/api/api-keys/{keyId}` | Revoke your key; returns `204`                  |
+
+Create a key:
+
+```sh
+curl -X POST "http://localhost:8787/api/api-keys" \
+  -H "Authorization: Bearer $ID_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Integration"}'
+```
+
+The response is `{"api_key":{"id":"...","user_id":"...","name":"Integration","key_prefix":"crm_...","created_at":"..."},"key":"crm_..."}`. Store the `key` securely when created: the full secret is returned only once. Creation and list responses use `Cache-Control: no-store`. Postgres stores only a SHA-256 hash of the randomly generated 256-bit secret, plus a short identifying prefix. List responses return `{"api_keys":[...],"page":{...}}` without secrets or hashes. Keys remain valid until revoked or their owner account is deleted. To rotate, create a new key, update the integration, then delete the old key.
+
+Use the key on collection list/detail reads or item list/create/read/update/delete:
+
+```sh
+curl "http://localhost:8787/api/collections" \
+  -H "X-API-Key: $API_KEY"
+
+curl -X POST "http://localhost:8787/api/collections/$COLLECTION_ID/items" \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"values":[]}'
+```
+
+Keys access only their owner's collections and items. They cannot use `actAs`, even when the owner is an admin. Collection mutations, separate field endpoints, user endpoints, and key management return `403` when authenticated with a valid API key. Collection reads already include field definitions. Existing pagination, filtering, value validation, and deletion rules also apply to key-authenticated requests. Missing, malformed, unknown, or revoked keys return `401`; other-account resources return `404`. A key belonging to another account cannot be revoked or listed, including by admins.
+
+Apply the additive schema with `npm run db:migrate` before using this feature. No additional Worker secrets are needed. Admins can also manage their own keys through the dashboard's **API keys** sidebar page at `/admin/api-keys`. The page lists key metadata, displays a new secret once with a copy button, and confirms revocation. It manages the signed-in admin's keys; opening another account's workspace does not change key ownership.
 
 ## Collections
 
@@ -229,15 +268,15 @@ Item list responses are `{"items":[...],"page":{...}}`; collection and account l
 
 Errors use `{"error":"message"}`. Request-schema errors also provide a `details` array of `{path,message}` objects. Responses never expose database internals.
 
-| Status | Meaning                                                                            |
-| ------ | ---------------------------------------------------------------------------------- |
-| 400    | Invalid JSON, IDs, body properties, field metadata, types or filters               |
-| 401    | Missing/invalid Google ID token; `WWW-Authenticate` included                       |
-| 403    | Account registration or ADMIN role required, or USER tried `actAs`/role assignment |
-| 404    | Missing resource or resource outside selected account                              |
-| 409    | Duplicate email/name or invalid/in-use database reference                          |
-| 413    | Body exceeds 256 KiB                                                               |
-| 500    | Unexpected server/configuration/database failure                                   |
+| Status | Meaning                                                                                    |
+| ------ | ------------------------------------------------------------------------------------------ |
+| 400    | Invalid JSON, IDs, body properties, field metadata, types or filters                       |
+| 401    | Missing/invalid Google ID token or API key; Google failures include `WWW-Authenticate`     |
+| 403    | Account registration or ADMIN role required, or credentials lack endpoint/scope permission |
+| 404    | Missing resource or resource outside selected account                                      |
+| 409    | Duplicate email/name or invalid/in-use database reference                                  |
+| 413    | Body exceeds 256 KiB                                                                       |
+| 500    | Unexpected server/configuration/database failure                                           |
 
 Deleting a field cascades its values. Deleting an item cascades its values but returns `409` if another remaining item's RELATION value points to it. Deleting a collection cascades its fields/items but returns `409` if a remaining relation field points to that collection. Clear the relation values or remove the relation field before deleting its target.
 

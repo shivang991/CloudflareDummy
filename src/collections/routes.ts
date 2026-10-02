@@ -9,6 +9,7 @@ import {
   router,
   scopeQuery,
   security,
+  apiKeySecurity,
   ApiError,
 } from "../utils/http";
 import { accountScope } from "../auth/service";
@@ -33,7 +34,7 @@ export function collectionsRoutes() {
       path: "/collections",
       tags: ["Collections"],
       summary: "List account collections",
-      security,
+      security: apiKeySecurity,
       request: { query: pageQuery },
       responses: {
         200: {
@@ -83,7 +84,7 @@ export function collectionsRoutes() {
       path: "/collections/{collectionId}",
       tags: ["Collections"],
       summary: "Read a collection",
-      security,
+      security: apiKeySecurity,
       request: { params, query: scopeQuery },
       responses: { 200: response, ...errors },
     }),

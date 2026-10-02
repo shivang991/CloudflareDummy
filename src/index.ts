@@ -3,6 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import { bodyLimit } from "hono/body-limit";
 import { authenticate, verifyGoogleIdentity, type VerifyIdentity } from "./auth/middleware";
 import { authRoutes } from "./auth/routes";
+import { apiKeyRoutes } from "./auth/apiKeys";
 import { collectionsRoutes } from "./collections/routes";
 import { fieldsRoutes } from "./fields/routes";
 import { itemsRoutes } from "./items/routes";
@@ -21,6 +22,13 @@ export function createApp(
     description: "Google ID token for the configured OAuth client. Requires a verified email.",
   });
   app.openAPIRegistry.register("ItemFilter", filterSchema);
+  app.openAPIRegistry.registerComponent("securitySchemes", "ApiKey", {
+    type: "apiKey",
+    in: "header",
+    name: "X-API-Key",
+    description:
+      "Account-owned API key created with POST /api/api-keys. Allows item CRUD and collection reads within the owner's account. Cannot use actAs. Send only one authentication header.",
+  });
   app.openapi(
     createRoute({
       method: "get",
@@ -51,6 +59,7 @@ export function createApp(
     ),
   );
   app.route("/api", authRoutes());
+  app.route("/api", apiKeyRoutes());
   app.route("/api", collectionsRoutes());
   app.route("/api", fieldsRoutes());
   app.route("/api", itemsRoutes());
@@ -60,7 +69,7 @@ export function createApp(
       title: "Mini CRM API",
       version: "2.0.0",
       description:
-        "Google-authenticated CRM. Register with POST /api/users. Resources default to your account; ADMIN may select another account using actAs=<user UUID> on collection, field and item endpoints. Updates use PATCH; unknown input properties are rejected. See docs/api.md for examples and filter semantics.",
+        "CRM authenticated with Google ID tokens, or account-owned API keys for item CRUD and collection reads. Register with POST /api/users and create keys with POST /api/api-keys using Google authentication. Resources default to your account; Google-authenticated ADMIN may select another account using actAs=<user UUID> on collection, field and item endpoints. Updates use PATCH; unknown input properties are rejected. See docs/api.md for examples and filter semantics.",
     },
     tags: [
       { name: "Auth", description: "Account registration and administration" },

@@ -26,9 +26,12 @@ export const content = <T extends z.ZodType>(schema: T) => ({ "application/json"
 
 export const errors = {
   400: { description: "Invalid JSON, parameters, or field value", content: content(errorSchema) },
-  401: { description: "Missing or invalid Google ID token", content: content(errorSchema) },
+  401: {
+    description: "Missing or invalid authentication credentials",
+    content: content(errorSchema),
+  },
   403: {
-    description: "Account registration or admin role required",
+    description: "Account registration, admin role, or permitted authentication method required",
     content: content(errorSchema),
   },
   404: {
@@ -44,6 +47,8 @@ export const errors = {
 };
 
 export const security = [{ GoogleIdToken: [] }];
+
+export const apiKeySecurity = [...security, { ApiKey: [] }];
 
 export const body = <T extends z.ZodType>(schema: T) => ({
   required: true as const,

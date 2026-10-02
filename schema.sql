@@ -10,6 +10,17 @@ CREATE TABLE IF NOT EXISTS crm_users (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 -- statement-breakpoint
+CREATE TABLE IF NOT EXISTS crm_api_keys (
+  id uuid PRIMARY KEY,
+  user_id uuid NOT NULL REFERENCES crm_users(id) ON DELETE CASCADE,
+  name varchar(200) NOT NULL CHECK (length(trim(name)) > 0),
+  key_prefix varchar(16) NOT NULL,
+  key_hash text NOT NULL UNIQUE CHECK (key_hash ~ '^[a-f0-9]{64}$'),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+-- statement-breakpoint
+CREATE INDEX IF NOT EXISTS crm_api_keys_owner_idx ON crm_api_keys(user_id,created_at DESC,id);
+-- statement-breakpoint
 CREATE TABLE IF NOT EXISTS crm_collections (
   id uuid PRIMARY KEY,
   user_id uuid NOT NULL REFERENCES crm_users(id) ON DELETE CASCADE,

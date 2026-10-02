@@ -79,10 +79,25 @@ test("public health/OpenAPI and authentication failures", async () => {
   ).toBe(true);
   expect(spec.components.schemas.ItemFilter).toBeDefined();
   for (const [path, methods] of Object.entries(spec.paths)) {
-    for (const operation of Object.values(methods as Record<string, { security?: unknown }>)) {
-      if (path.startsWith("/api/")) expect(operation.security).toEqual([{ GoogleIdToken: [] }]);
+    for (const [method, operation] of Object.entries(
+      methods as Record<string, { security?: unknown }>,
+    )) {
+      if (path.startsWith("/api/")) {
+        const supportsApiKey =
+          path.includes("/items") ||
+          (method === "get" &&
+            ["/api/collections", "/api/collections/{collectionId}"].includes(path));
+        expect(operation.security).toEqual(
+          supportsApiKey ? [{ GoogleIdToken: [] }, { ApiKey: [] }] : [{ GoogleIdToken: [] }],
+        );
+      }
     }
   }
+  expect(spec.components.securitySchemes.ApiKey).toMatchObject({
+    type: "apiKey",
+    in: "header",
+    name: "X-API-Key",
+  });
   expect((await h.app.request("/api/users/me", {}, env)).status).toBe(401);
   expect((await h.request("/api/users/me", "invalid")).status).toBe(401);
   expect((await h.request("/api/users/not-an-id")).status).toBe(400);
