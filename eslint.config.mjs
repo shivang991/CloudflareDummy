@@ -2,6 +2,7 @@ import eslint from "@eslint/js";
 import stylistic from "@stylistic/eslint-plugin";
 import globals from "globals";
 import tseslint from "typescript-eslint";
+import vue from "eslint-plugin-vue";
 
 const declarations = [
   "function",
@@ -17,13 +18,36 @@ const declarations = [
 
 export default [
   {
+    ignores: [
+      "dist/**",
+      "node_modules/**",
+      ".wrangler/**",
+      "playwright-report/**",
+      "test-results/**",
+    ],
+  },
+  {
     ...eslint.configs.recommended,
-    files: ["src/**/*.ts", "scripts/**/*.mjs", "tests/**/*.ts"],
+    files: ["src/**/*.ts", "frontend/**/*.ts", "scripts/**/*.mjs", "tests/**/*.ts", "*.config.ts"],
   },
   ...tseslint.configs.recommended.map((config) => ({
     ...config,
-    files: ["src/**/*.ts", "tests/**/*.ts"],
+    files: ["src/**/*.ts", "frontend/**/*.ts", "tests/**/*.ts", "*.config.ts"],
   })),
+  ...vue.configs["flat/essential"],
+  {
+    files: ["frontend/**/*.vue"],
+    languageOptions: { parserOptions: { parser: tseslint.parser }, globals: globals.browser },
+    plugins: { "@typescript-eslint": tseslint.plugin },
+    rules: {
+      "vue/multi-word-component-names": "off",
+      "@typescript-eslint/no-unused-vars": "error",
+    },
+  },
+  {
+    files: ["frontend/**/*.ts"],
+    languageOptions: { globals: globals.browser },
+  },
   {
     files: ["src/**/*.ts", "scripts/**/*.mjs", "tests/**/*.ts"],
     plugins: { "@stylistic": stylistic },
@@ -41,7 +65,7 @@ export default [
     languageOptions: { globals: globals.serviceworker },
   },
   {
-    files: ["scripts/**/*.mjs", "tests/**/*.ts"],
+    files: ["scripts/**/*.mjs", "tests/**/*.ts", "*.config.ts"],
     languageOptions: { globals: globals.node },
   },
 ];

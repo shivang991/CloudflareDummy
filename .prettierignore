@@ -1,2 +1,6 @@
 package-lock.json
 schema.sql
+dist/
+.wrangler/
+playwright-report/
+test-results/

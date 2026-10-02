@@ -8,7 +8,10 @@
     "noEmit": true,
     "skipLibCheck": true,
     "allowJs": true,
-    "types": ["node"]
+    "types": ["node"],
+    "paths": {
+      "@/*": ["./frontend/*"]
+    }
   },
   "include": ["src/**/*.ts", "tests/**/*.ts", "scripts/**/*.mjs"]
 }
