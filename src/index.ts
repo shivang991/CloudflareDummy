@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { swaggerUI } from "@hono/swagger-ui";
 import { HTTPException } from "hono/http-exception";
 import { bodyLimit } from "hono/body-limit";
 import { authenticate, verifyGoogleIdentity, type VerifyIdentity } from "./auth/middleware";
@@ -78,6 +79,14 @@ export function createApp(
       { name: "Items", description: "Items and typed field values" },
     ],
   });
+  app.get(
+    "/docs",
+    swaggerUI({
+      url: "/openapi.json",
+      title: "Mini CRM API documentation",
+      persistAuthorization: false,
+    }),
+  );
   app.notFound((c) => c.json({ error: "Not found" }, 404));
   app.onError((error, c) => {
     if (error instanceof ApiError) return c.json({ error: error.message }, error.status);

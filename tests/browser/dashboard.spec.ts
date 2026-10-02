@@ -598,7 +598,10 @@ test("revoking the last key on a page returns to the previous page and expiry cl
   await expect(page.getByLabel("Your new API key")).toHaveCount(0);
 });
 
-test("static deep links preserve real Worker routing and authentication", async ({ request }) => {
+test("static deep links preserve real Worker routing and authentication", async ({
+  request,
+  page,
+}) => {
   const deepLink = await request.get(`/admin/accounts/${id(2)}/collections/${id(3)}`);
   expect(deepLink.headers()["content-type"]).toContain("text/html");
   expect((await request.get("/admin/api-keys")).headers()["content-type"]).toContain("text/html");
@@ -606,7 +609,16 @@ test("static deep links preserve real Worker routing and authentication", async 
   expect(await health.json()).toEqual({ ok: true });
   const schema = await request.get("/openapi.json");
   expect((await schema.json()).openapi).toBe("3.0.3");
+  const docs = await request.get("/docs");
+  expect(docs.status()).toBe(200);
+  expect(docs.headers()["content-type"]).toContain("text/html");
+  expect(await docs.text()).toContain("SwaggerUIBundle");
   const unauthorized = await request.get("/api/users");
   expect(unauthorized.status()).toBe(401);
   expect(await unauthorized.json()).toEqual({ error: "Google ID token required" });
+  await page.goto("/docs");
+  await expect(page.getByRole("heading", { name: "Mini CRM API", exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Authorize", exact: false }).first().click();
+  await expect(page.getByRole("heading", { name: "GoogleIdToken", exact: false })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "ApiKey", exact: false })).toBeVisible();
 });

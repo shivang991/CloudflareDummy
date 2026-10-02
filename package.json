@@ -19,6 +19,7 @@
     "test:browser": "playwright test"
   },
   "dependencies": {
+    "@hono/swagger-ui": "^0.6.1",
     "@hono/zod-openapi": "^1.6.3",
     "@lucide/vue": "^1.49.0",
     "@neondatabase/serverless": "^1.1.0",

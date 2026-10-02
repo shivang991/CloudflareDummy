@@ -5,6 +5,7 @@ A CRM API and Vue admin dashboard on Cloudflare Workers, Hono, and Neon/Postgres
 - [API reference and examples](docs/api.md)
 - [Database design](docs/database.md)
 - Generated OpenAPI 3.0.3 document: `GET /openapi.json` (public)
+- Swagger UI: `/docs` (public). Use **Authorize** with your Google ID token or API key to try protected endpoints; send only one authentication method. Credentials are not persisted across reloads. Swagger UI assets load from jsDelivr.
 - Health check: `GET /health` (public, does not query Postgres)
 
 ## Setup
@@ -45,7 +46,7 @@ The dashboard supports account provisioning/profile/role changes/deletion; accou
 
 `npm run dev` uses Vite with the Cloudflare plugin to serve the frontend and Worker on one origin. `npm run build` checks both TypeScript projects and builds the browser assets and Worker; `npm run preview` serves a production build locally.
 
-For deployment, set `DATABASE_URL` and `GOOGLE_CLIENT_ID` as Wrangler secrets, ensure the public `VITE_GOOGLE_CLIENT_ID` is available at build time, then use `npm run deploy`. This builds and deploys both the dashboard and API together. Seed variables are only needed when running the seed script. The existing Wrangler worker name is retained. Static assets serve the SPA, including deep links; `/api/*`, `/health`, and `/openapi.json` always reach Hono. The static shell is public; all CRM data remains protected by the API's authentication and role checks.
+For deployment, set `DATABASE_URL` and `GOOGLE_CLIENT_ID` as Wrangler secrets, ensure the public `VITE_GOOGLE_CLIENT_ID` is available at build time, then use `npm run deploy`. This builds and deploys both the dashboard and API together. Seed variables are only needed when running the seed script. The existing Wrangler worker name is retained. Static assets serve the SPA, including deep links; `/api/*`, `/health`, `/openapi.json`, and `/docs` always reach Hono. The static shell and API documentation are public; all CRM data remains protected by the API's authentication and role checks.
 
 ## Checks
 
